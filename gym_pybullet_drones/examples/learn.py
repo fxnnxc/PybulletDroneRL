@@ -18,7 +18,7 @@ reinforcement learning library `stable-baselines3`.
 import os
 import time
 from datetime import datetime
-import argparse
+import argparseb
 import gymnasium as gym
 import numpy as np
 import torch
@@ -36,7 +36,7 @@ from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 DEFAULT_GUI = True
 DEFAULT_RECORD_VIDEO = False
 DEFAULT_OUTPUT_FOLDER = 'results'
-DEFAULT_COLAB = False
+DEFAULT_COLAB = Falseb
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
