@@ -24,7 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--battery-alpha", type=float, default=0.1,
                         help="Battery consumption penalty coefficient (default: 0.1)")
-    parser.add_argument("--total-timesteps", type=int, default=100000,
+    parser.add_argument("--total-timesteps", type=int, default=300000,
                         help="Total timesteps for training (default: 100000)")
     parser.add_argument("--learning-starts", type=int, default=1000,
                         help="Number of timesteps before learning starts (default: 1000)")
@@ -74,7 +74,8 @@ class CustomEnv():
 
         if action.ndim == 3:
             action = action[0]
-        state, reward, done, truc, info = self.env.step(action)
+        target_pos = action + self.env.waypoints[self.env.current_waypoint_idx]
+        state, reward, done, truc, info = self.env.step(target_pos)
         self.info['episode']['l'] += 1 
         self.info['episode']['r'] += reward
         self.done = done
