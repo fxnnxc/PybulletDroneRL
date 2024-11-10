@@ -216,7 +216,7 @@ class DSLPIDControl(BaseControl):
                                target_euler,
                                target_rpy_rates
                                ):
-        """DSL's CF2.x PID attitude control.
+        """DSL PID attitude control.
 
         Parameters
         ----------
@@ -225,7 +225,7 @@ class DSLPIDControl(BaseControl):
         thrust : float
             The target thrust along the drone z-axis.
         cur_quat : ndarray
-            (4,1)-shaped array of floats containing the current orientation as a quaternion.
+            (4,1)-shaped array of floats containing the current orientation as a quaternion (w,x,y,z).
         target_euler : ndarray
             (3,1)-shaped array of floats containing the computed target Euler angles.
         target_rpy_rates : ndarray
@@ -237,11 +237,27 @@ class DSLPIDControl(BaseControl):
             (4,1)-shaped array of integers containing the RPMs to apply to each of the 4 motors.
 
         """
+        # 쿼터니언 정규화 추가
+        cur_quat_norm = np.linalg.norm(cur_quat)
+        if cur_quat_norm < 1e-6:  # 거의 0인 경우
+            cur_quat = np.array([1., 0., 0., 0.])  # 기본 쿼터니언으로 설정
+        else:
+            cur_quat = cur_quat / cur_quat_norm  # 정규화
+        
+        w, x, y, z = cur_quat
+        
+        # 안전 체크 추가
+        if np.isnan(w) or np.isnan(x) or np.isnan(y) or np.isnan(z):
+            w, x, y, z = 1., 0., 0., 0.
+        
+        try:
+            target_rotation = (Rotation.from_quat([w, x, y, z])).as_matrix()
+        except ValueError:
+            print(f"Warning: Invalid quaternion detected [{w}, {x}, {y}, {z}]. Using identity rotation.")
+            target_rotation = np.eye(3)  # 단위 행렬 사용
+        
         cur_rotation = np.array(p.getMatrixFromQuaternion(cur_quat)).reshape(3, 3)
         cur_rpy = np.array(p.getEulerFromQuaternion(cur_quat))
-        target_quat = (Rotation.from_euler('XYZ', target_euler, degrees=False)).as_quat()
-        w,x,y,z = target_quat
-        target_rotation = (Rotation.from_quat([w, x, y, z])).as_matrix()
         rot_matrix_e = np.dot((target_rotation.transpose()),cur_rotation) - np.dot(cur_rotation.transpose(),target_rotation)
         rot_e = np.array([rot_matrix_e[2, 1], rot_matrix_e[0, 2], rot_matrix_e[1, 0]]) 
         rpy_rates_e = target_rpy_rates - (cur_rpy - self.last_rpy)/control_timestep

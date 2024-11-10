@@ -1,4 +1,3 @@
-
 import numpy as np 
 import torch 
 import torch.nn as nn 
@@ -18,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 import random 
 import time 
+import os
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -5
@@ -34,25 +34,45 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(256, 256)
         self.fc_mean = nn.Linear(256, np.prod(action_shape))
         self.fc_logstd = nn.Linear(256, np.prod(action_shape))
+        
         # action rescaling
         self.register_buffer(
-            "action_scale", torch.tensor((self.action_space_high - self.action_space_low) / 2.0, dtype=torch.float32)
+            "action_scale", 
+            torch.tensor((self.action_space_high - self.action_space_low) / 2.0, dtype=torch.float32)
         )
         self.register_buffer(
-            "action_bias", torch.tensor((self.action_space_high + self.action_space_low) / 2.0, dtype=torch.float32)
+            "action_bias", 
+            torch.tensor((self.action_space_high + self.action_space_low) / 2.0, dtype=torch.float32)
         )
+        
+        # Initialize weights
+        self.apply(self._init_weights)
+    
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            torch.nn.init.xavier_uniform_(m.weight)
+            torch.nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
+        # Ensure input is float32
+        x = x.to(torch.float32)
+        
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         mean = self.fc_mean(x)
         log_std = self.fc_logstd(x)
         log_std = torch.tanh(log_std)
-        log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)  # From SpinUp / Denis Yarats
+        log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)
 
         return mean, log_std
 
     def get_action(self, x):
+        # Ensure input tensor
+        if not isinstance(x, torch.Tensor):
+            x = torch.FloatTensor(x).to(self.action_scale.device)
+        if x.ndim == 1:
+            x = x.unsqueeze(0)
+            
         mean, log_std = self(x)
         std = log_std.exp()
         normal = torch.distributions.Normal(mean, std)
@@ -83,16 +103,34 @@ class SoftQNetwork(nn.Module):
         return x
 
 
-def train_sac(envs, actor, qf1, qf2, qf1_target, qf2_target, run_name='test',  **kwargs,):
+def train_sac(
+    envs,
+    actor,
+    qf1,
+    qf2,
+    qf1_target,
+    qf2_target,
+    device='cuda',
+    total_timesteps=100000,
+    learning_starts=1000,
+    save_dir="outputs",
+    seed=1
+):
+    # Create save directory if it doesn't exist
+    # os.makedirs(save_dir, exist_ok=True)
+    
+    # Set up writer in the specified save directory
+    writer = SummaryWriter(save_dir)
+    
     args = OmegaConf.create({
         'buffer_size' : 100000,
         'policy_lr' : 3e-4,
         'q_lr' : 1e-3,
-        'total_timesteps' : 1000000,
-        'seed' : 0,
+        'total_timesteps' : total_timesteps,
+        'seed' : seed,
         'torch_deterministic' : True,
         'autotune' : True,
-        'learning_starts' : 1000,
+        'learning_starts' : learning_starts,
         'batch_size':256,
         'gamma' : 0.99,
         'tau' : 0.005,
@@ -100,15 +138,14 @@ def train_sac(envs, actor, qf1, qf2, qf1_target, qf2_target, run_name='test',  *
         'noise_clip' : 0.5,
         'alpha' : 0.2, 
         'target_network_frequency' : 1,
-        'device' : 'cpu',
+        'device' : device,
     })
     
-    for k, v in kwargs.items():
+    for k, v in args.items():
         print(f"set:{k} = {v}", )
         setattr(args, k, v)
 
-
-    writer = SummaryWriter(f"runs/{run_name}")
+    OmegaConf.save(args, os.path.join(save_dir, "config.yaml"))
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
@@ -266,4 +303,15 @@ def train_sac(envs, actor, qf1, qf2, qf1_target, qf2_target, run_name='test',  *
                 if args.autotune:
                     writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
 
+        # Save model periodically (every 10% of total timesteps)
+        if global_step > 0 and global_step % (args.total_timesteps // 10) == 0:
+            model_save_dir = os.path.join(save_dir, f"actor_{global_step}.pth")
+            torch.save(actor.state_dict(), model_save_dir)
+            print(f"Saved model at step {global_step} to {model_save_dir}")
+
+    # Save final model
+    final_model_path = os.path.join(save_dir, "actor_final.pth")
+    torch.save(actor.state_dict(), final_model_path)
+    print(f"Saved final model to {final_model_path}")
+    
     writer.close()
