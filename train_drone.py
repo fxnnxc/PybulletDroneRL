@@ -70,7 +70,7 @@ class CustomEnv():
         if self.done:
             obs, info = self.env.reset()
             self.done = False 
-            return obs, 0, False, False, info 
+            return [obs], 0, [False], [False], [info] 
 
         if action.ndim == 3:
             action = action[0]

@@ -148,7 +148,7 @@ class BatteryWayPointAviary(BaseRLAviary):
             Whether the current episode is done.
 
         """
-        return self.current_waypoint_idx >= len(self.waypoints) - 1
+        return self._computeTruncated()
         
 
         
@@ -178,6 +178,8 @@ class BatteryWayPointAviary(BaseRLAviary):
         # # Check other truncation conditions
         # if (abs(state[7]) > .4 or abs(state[8]) > .4):  # Truncate when the drone is too tilted
         #     return True
+        if self.current_waypoint_idx >= len(self.waypoints) - 1:
+            return True 
         
         return False
 
