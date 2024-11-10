@@ -27,8 +27,9 @@ def test(model_path, n_episodes=100, device="cuda"):
     action_space_low = env.single_action_space.low
     
     # Initialize actor and load weights
-    actor = Actor(obs_dim, action_dim, action_space_high, action_space_low).to(device)
+    actor = Actor(obs_dim, action_dim, action_space_high, action_space_low)
     actor.load_state_dict(torch.load(model_path))
+    actor.to(device)
     actor.eval()
     
     # Test loop
@@ -58,6 +59,7 @@ def test(model_path, n_episodes=100, device="cuda"):
             episode_length += 1
             state = next_state[0]
             done = done[0]
+            print(final_waypoint_idx)
             final_waypoint_idx = max(env.env.current_waypoint_idx, final_waypoint_idx)
 
         
@@ -118,5 +120,5 @@ def test(model_path, n_episodes=100, device="cuda"):
     return mean_reward, std_reward, success_rate, mean_waypoint_progress
 
 if __name__ == "__main__":
-    model_path = "outputs/battery_0.0_seed1/20241111_012334/actor_180000.pth"
+    model_path = "outputs/battery_0.1_seed1/20241111_021934/actor_30000.pth"
     test(model_path, n_episodes=10)

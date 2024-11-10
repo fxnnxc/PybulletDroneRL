@@ -59,8 +59,8 @@ class CustomEnv():
         print(self.env.observation_space.shape)
         print("===========================")
         
-        
-        self.single_action_space  = gym.spaces.Box(-1, 1, shape=(action_dim,))
+        ACTION_BOUND = 0.1
+        self.single_action_space  = gym.spaces.Box(-ACTION_BOUND, ACTION_BOUND, shape=(action_dim,))
         self.single_observation_space  = gym.spaces.Box(-np.inf, np.inf, shape=(obs_dim,), dtype=np.float32)
         
         
