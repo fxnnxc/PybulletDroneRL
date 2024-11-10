@@ -152,7 +152,7 @@ def main():
         device=args.device,
         total_timesteps=args.total_timesteps,
         learning_starts=args.learning_starts,
-        save_dir=args.save_dir
+        save_dir=save_path
     )
 
 if __name__ == "__main__":
