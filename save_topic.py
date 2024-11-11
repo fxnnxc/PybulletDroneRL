@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 import rospy
 import json
-from std_msgs.msg import String
+from std_msgs.msg import String, Int32, Float32, Bool
+from sensor_msgs.msg import Imu, NavSatFix, Image
+from geometry_msgs.msg import Twist, Pose, PoseStamped
+from nav_msgs.msg import Odometry
 from datetime import datetime
 import time
 from collections import deque
@@ -10,33 +13,35 @@ class MultiTopicToJson:
     def __init__(self):
         rospy.init_node('multi_topic_to_json_node', anonymous=True)
         
-        # 샘플링 설정
-        self.sampling_rate = 5  # 1초당 저장할 샘플 수
+        # 토픽과 해당 메시지 타입을 딕셔너리로 정의
+        self.topic_types = {
+            '/rostopic/aaa': Imu,           # 예: IMU 데이터
+            '/rostopic/bbb': Odometry,      # 예: 오도메트리 데이터
+            '/rostopic/ccc': PoseStamped,   # 예: 위치 데이터
+            # 필요한 토픽과 타입을 추가하세요
+        }
+        
+        self.sampling_rate = 5
         self.sampling_interval = 1.0 / self.sampling_rate
-        self.recording_duration = 60  # 각 파일당 녹화 시간 (초)
-        self.auto_save_interval = 10  # 자동 저장 주기 (초)
+        self.recording_duration = 60
+        self.auto_save_interval = 10
         self.last_auto_save = time.time()
         
-        # 구독할 토픽 리스트
-        self.topic_list = [
-            '/mavros/local_position/pose',
-            '/mavros/local_position/velocity',
-        ]
+        # 토픽 리스트 업데이트
+        self.topic_list = list(self.topic_types.keys())
         
         # 타이머 설정
         rospy.Timer(rospy.Duration(1.0), self.print_status)
         rospy.Timer(rospy.Duration(self.sampling_interval), self.save_sample)
-        rospy.Timer(rospy.Duration(self.auto_save_interval), self.auto_save)  # 주기적 저장 타이머
+        rospy.Timer(rospy.Duration(self.auto_save_interval), self.auto_save)
         
         self.initialize_recording()
-        
+
     def initialize_recording(self):
-        """새로운 녹화 세션 초기화"""
         self.json_file = f"ros_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         self.start_time = time.time()
         self.last_auto_save = time.time()
         
-        # 버퍼 및 데이터 저장소 초기화
         self.temp_buffers = {}
         self.data_dict = {}
         self.message_counts = {}
@@ -46,26 +51,87 @@ class MultiTopicToJson:
             self.temp_buffers[topic] = deque(maxlen=1)
             self.message_counts[topic] = 0
             
-        # 구독자 재설정
         if hasattr(self, 'subscribers'):
             for sub in self.subscribers:
                 sub.unregister()
                 
+        # 각 토픽 타입에 맞는 Subscriber 생성
         self.subscribers = [
-            rospy.Subscriber(topic, String, self.callback, callback_args=topic)
-            for topic in self.topic_list
+            rospy.Subscriber(topic, msg_type, self.callback, callback_args=topic)
+            for topic, msg_type in self.topic_types.items()
         ]
         
         print("\n=== New Recording Session Started ===")
         print(f"Sampling Rate: {self.sampling_rate} Hz")
         print(f"Recording Duration: {self.recording_duration} seconds")
         print(f"Auto-save interval: {self.auto_save_interval} seconds")
-        print(f"Recording will end at: {datetime.fromtimestamp(time.time() + self.recording_duration).strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Output file: {self.json_file}")
         print("\nSubscribing to topics:")
-        for topic in self.topic_list:
-            print(f"- {topic}")
-        print("\nRecording... Press Ctrl+C to stop completely\n")
+        for topic, msg_type in self.topic_types.items():
+            print(f"- {topic} ({msg_type.__name__})")
+
+    def convert_msg_to_dict(self, msg):
+        """ROS 메시지를 딕셔너리로 변환"""
+        if isinstance(msg, (int, float, str, bool)):
+            return msg
+            
+        if hasattr(msg, 'header'):
+            # 헤더가 있는 메시지 처리
+            data = {
+                'header': {
+                    'seq': msg.header.seq,
+                    'stamp': msg.header.stamp.to_sec(),
+                    'frame_id': msg.header.frame_id
+                }
+            }
+        else:
+            data = {}
+
+        # 메시지 타입별 처리
+        if isinstance(msg, Imu):
+            data.update({
+                'orientation': {'x': msg.orientation.x, 'y': msg.orientation.y, 
+                              'z': msg.orientation.z, 'w': msg.orientation.w},
+                'angular_velocity': {'x': msg.angular_velocity.x, 'y': msg.angular_velocity.y, 
+                                   'z': msg.angular_velocity.z},
+                'linear_acceleration': {'x': msg.linear_acceleration.x, 'y': msg.linear_acceleration.y, 
+                                      'z': msg.linear_acceleration.z}
+            })
+        elif isinstance(msg, Odometry):
+            data.update({
+                'pose': {
+                    'position': {'x': msg.pose.pose.position.x, 'y': msg.pose.pose.position.y, 
+                               'z': msg.pose.pose.position.z},
+                    'orientation': {'x': msg.pose.pose.orientation.x, 'y': msg.pose.pose.orientation.y,
+                                  'z': msg.pose.pose.orientation.z, 'w': msg.pose.pose.orientation.w}
+                },
+                'twist': {
+                    'linear': {'x': msg.twist.twist.linear.x, 'y': msg.twist.twist.linear.y, 
+                             'z': msg.twist.twist.linear.z},
+                    'angular': {'x': msg.twist.twist.angular.x, 'y': msg.twist.twist.angular.y, 
+                              'z': msg.twist.twist.angular.z}
+                }
+            })
+        elif isinstance(msg, PoseStamped):
+            data.update({
+                'pose': {
+                    'position': {'x': msg.pose.position.x, 'y': msg.pose.position.y, 
+                               'z': msg.pose.position.z},
+                    'orientation': {'x': msg.pose.orientation.x, 'y': msg.pose.orientation.y,
+                                  'z': msg.pose.orientation.z, 'w': msg.pose.orientation.w}
+                }
+            })
+        
+        return data
+
+    def callback(self, msg, topic_name):
+        self.message_counts[topic_name] += 1
+        
+        # ROS 메시지를 딕셔너리로 변환하여 저장
+        msg_dict = self.convert_msg_to_dict(msg)
+        msg_dict['timestamp'] = rospy.get_time()
+        
+        self.temp_buffers[topic_name].append(msg_dict)
 
     def auto_save(self, event):
         """주기적으로 데이터 저장"""
@@ -75,13 +141,6 @@ class MultiTopicToJson:
             self.last_auto_save = current_time
             print(f"\n[Auto-save] Data saved to {self.json_file}")
 
-    def callback(self, msg, topic_name):
-        self.message_counts[topic_name] += 1
-        self.temp_buffers[topic_name].append({
-            'timestamp': rospy.get_time(),
-            'data': msg.data
-        })
-        
     def print_status(self, event):
         elapsed_time = time.time() - self.start_time
         remaining_time = max(0, self.recording_duration - elapsed_time)
