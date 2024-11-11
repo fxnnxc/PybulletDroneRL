@@ -19,8 +19,8 @@ class MultiTopicToJson:
         
         # 구독할 토픽 리스트
         self.topic_list = [
-            '/rostopic/aaa',
-            '/rostopic/bbb',
+            '/mavros/local_position/pose',
+            '/mavros/local_position/velocity',
         ]
         
         # 타이머 설정
