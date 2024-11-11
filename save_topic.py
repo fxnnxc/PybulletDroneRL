@@ -8,6 +8,8 @@ from nav_msgs.msg import Odometry
 from datetime import datetime
 import time
 from collections import deque
+from rospy_message_converter import message_converter
+from sensor_msgs.msg import BatteryState
 
 class MultiTopicToJson:
     def __init__(self):
@@ -18,6 +20,7 @@ class MultiTopicToJson:
             '/rostopic/aaa': Imu,           # 예: IMU 데이터
             '/rostopic/bbb': Odometry,      # 예: 오도메트리 데이터
             '/rostopic/ccc': PoseStamped,   # 예: 위치 데이터
+            '/battery': BatteryState,       # 배터리 상태 토픽 추가
             # 필요한 토픽과 타입을 추가하세요
         }
         
@@ -120,6 +123,17 @@ class MultiTopicToJson:
                     'orientation': {'x': msg.pose.orientation.x, 'y': msg.pose.orientation.y,
                                   'z': msg.pose.orientation.z, 'w': msg.pose.orientation.w}
                 }
+            })
+        elif isinstance(msg, BatteryState):
+            data.update({
+                'voltage': msg.voltage,
+                'current': msg.current,
+                'percentage': msg.percentage,
+                'power_supply_status': msg.power_supply_status,
+                'power_supply_health': msg.power_supply_health,
+                'present': msg.present,
+                'cell_voltage': msg.cell_voltage,
+                'location': msg.location
             })
         
         return data
