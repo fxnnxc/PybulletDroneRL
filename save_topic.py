@@ -14,12 +14,15 @@ from sensor_msgs.msg import BatteryState
 class MultiTopicToJson:
     def __init__(self):
         rospy.init_node('multi_topic_to_json_node', anonymous=True)
+        self.last_sample_times = {}  # 각 토픽별 마지막 샘플링 시간을 저장할 딕셔너리
+        for topic in self.topic_list:
+            self.last_sample_times[topic] = 0.0
         
         # 토픽과 해당 메시지 타입을 딕셔너리로 정의
         self.topic_types = {
-            '/rostopic/aaa': Imu,           # 예: IMU 데이터
-            '/rostopic/bbb': Odometry,      # 예: 오도메트리 데이터
-            '/rostopic/ccc': PoseStamped,   # 예: 위치 데이터
+            '/mavros/local_position/imu': Imu,           # 예: IMU 데이터
+            '/mavros/local_position/odometry': Odometry,      # 예: 오도메트리 데이터
+            '/mavros/local_position/pose': PoseStamped,   # 예: 위치 데이터
             '/battery': BatteryState,       # 배터리 상태 토픽 추가
             # 필요한 토픽과 타입을 추가하세요
         }
@@ -139,13 +142,18 @@ class MultiTopicToJson:
         return data
 
     def callback(self, msg, topic_name):
-        self.message_counts[topic_name] += 1
+        current_time = rospy.get_time()
         
-        # ROS 메시지를 딕셔너리로 변환하여 저장
-        msg_dict = self.convert_msg_to_dict(msg)
-        msg_dict['timestamp'] = rospy.get_time()
-        
-        self.temp_buffers[topic_name].append(msg_dict)
+        # sampling interval 이상의 시간이 지났을 때만 데이터 저장
+        if current_time - self.last_sample_times.get(topic_name, 0.0) >= self.sampling_interval:
+            self.message_counts[topic_name] += 1
+            
+            # ROS 메시지를 딕셔너리로 변환하여 저장
+            msg_dict = self.convert_msg_to_dict(msg)
+            msg_dict['timestamp'] = current_time
+            
+            self.temp_buffers[topic_name].append(msg_dict)
+            self.last_sample_times[topic_name] = current_time
 
     def auto_save(self, event):
         """주기적으로 데이터 저장"""
@@ -173,7 +181,7 @@ class MultiTopicToJson:
     def save_sample(self, event):
         current_time = time.time()
         
-        # 현재 녹화 세션의 시간이 다 되었는지 체크
+        # 현재 녹화 세션의 시간이 다 되었는�� 체크
         if current_time - self.start_time > self.recording_duration:
             self.save_to_json()
             print(f"\n=== Recording Session Completed ===")
