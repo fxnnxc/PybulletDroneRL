@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import rospy
 import json
-from std_msgs.msg import String, Int32, Float32, Bool
+from std_msgs.msg import String, Int32, Float32, Bool   
+
 from sensor_msgs.msg import Imu, NavSatFix, Image
 from geometry_msgs.msg import Twist, Pose, PoseStamped
 from nav_msgs.msg import Odometry
@@ -15,14 +16,14 @@ class MultiTopicToJson:
         rospy.init_node('multi_topic_to_json_node', anonymous=True)
         self.last_sample_times = {}  # 각 토픽별 마지막 샘플링 시간을 저장할 딕셔너리
         for topic in self.topic_list:
-            self.last_sample_times[topic] = 0.0
+            self.last_sample_times[topic] = time.time()
         
         # 토픽과 해당 메시지 타입을 딕셔너리로 정의
         self.topic_types = {
             '/mavros/local_position/imu': Imu,           # 예: IMU 데이터
-            '/mavros/local_position/odometry': Odometry,      # 예: 오도메트리 데이터
+            '/mavros/local_position/odom': Odometry,      # 예: 오도메트리 데이터
             '/mavros/local_position/pose': PoseStamped,   # 예: 위치 데이터
-            '/battery': BatteryState,       # 배터리 상태 토픽 추가
+            '/mavros/battery': BatteryState,       # 배터리 상태 토픽 추가
             # 필요한 토픽과 타입을 추가하세요
         }
         
@@ -141,7 +142,7 @@ class MultiTopicToJson:
         return data
 
     def callback(self, msg, topic_name):
-        current_time = rospy.get_time()
+        current_time = time.time()
         # sampling interval 이상의 시간이 지났을 때만 데이터 저장
         if current_time - self.last_sample_times.get(topic_name, 0.0) >= self.sampling_interval:
             self.message_counts[topic_name] += 1
@@ -162,9 +163,10 @@ class MultiTopicToJson:
             print(f"\n[Auto-save] Data saved to {self.json_file}")
 
     def print_status(self, event):
-        elapsed_time = time.time() - self.start_time
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time
         remaining_time = max(0, self.recording_duration - elapsed_time)
-        next_save = self.auto_save_interval - (time.time() - self.last_auto_save)
+        next_save = self.auto_save_interval - (current_time - self.last_auto_save)
         
         print("\n--- Recording Status ---")
         print(f"Current file: {self.json_file}")
@@ -179,7 +181,7 @@ class MultiTopicToJson:
     def save_sample(self, event):
         current_time = time.time()
         
-        # 현재 녹화 세션의 시간이 다 되었는�� 체크
+        # 현재 녹화 세션의 시간이 다 되었는지 체크
         if current_time - self.start_time > self.recording_duration:
             self.save_to_json()
             print(f"\n=== Recording Session Completed ===")
@@ -205,7 +207,7 @@ class MultiTopicToJson:
                 json.dump(self.data_dict, f, indent=4)
         except Exception as e:
             print(f"\n[Error] Failed to save data: {str(e)}")
-            
+            ㅡ
     def run(self):
         rospy.spin()
 
