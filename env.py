@@ -11,6 +11,8 @@ from PIL import Image
 # egl = pkgutil.get_loader('eglRenderer')
 import pybullet as p
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
+import gymnasium as gym
+import torch 
 
 class BatteryWayPointAviary(BaseRLAviary):
     """Single agent RL problem: hover at position."""
@@ -66,8 +68,8 @@ class BatteryWayPointAviary(BaseRLAviary):
         self.NUM_WAYPOINTS = 10  # Number of intermediate waypoints
         self.EPSILON = 0.1  # Distance threshold to consider waypoint reached
         self.TIME_LIMIT_SEC = 20.0  # Time limit in seconds
-        self.FINAL_DISTANCE = 2.0  # Final x-coordinate destination
-        self.TERMINATION_BOUND = 5.0  # Maximum allowed distance from target
+        self.FINAL_DISTANCE = 10.0  # Final x-coordinate destination
+        self.TERMINATION_BOUND = 10.0  # Maximum allowed distance from target
         self.battery_alpha = battery_alpha
         self.current_distance_reward = 0.0
         self.current_battery_penalty = 0.0
@@ -113,6 +115,7 @@ class BatteryWayPointAviary(BaseRLAviary):
         self.waypoints = np.array(self.waypoints)
         
         initial_obs, initial_info = super().reset()
+        # print("cccccccccccc")
         return initial_obs, initial_info
         
     
@@ -139,7 +142,7 @@ class BatteryWayPointAviary(BaseRLAviary):
         
         # Calculate distance reward using 1/(1+distance) format
         squared_distance = np.mean((current_pos - target_pos)**2)
-        self.current_distance_reward = 1 - 1 / (1 + squared_distance)
+        self.current_distance_reward = - 1 + 1 / (1 + squared_distance)
         
         # Calculate battery penalty
         self.current_battery_penalty = 0
@@ -502,3 +505,55 @@ class BatteryWayPointAviary(BaseRLAviary):
             ############################################################
         else:
             print("[ERROR] in BaseRLAviary._observationSpace()")
+            
+
+class CustomEnv():
+    def __init__(self, battery_alpha):
+
+        DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
+        DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+
+        self.env = BatteryWayPointAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, battery_alpha=battery_alpha)
+        
+        action_dim = 3
+        obs_dim = self.env.observation_space.shape[-1]
+        
+        print("=======Pybullet============")
+        print(self.env.action_space)
+        print(self.env.observation_space.shape)
+        print("===========================")
+        
+        ACTION_BOUND = 1.0
+        self.single_action_space  = gym.spaces.Box(-ACTION_BOUND, ACTION_BOUND, shape=(action_dim,))
+        self.single_observation_space  = gym.spaces.Box(-np.inf, np.inf, shape=(obs_dim,), dtype=np.float32)
+        
+        
+    def step(self, action):
+        if isinstance(action, torch.Tensor):
+            action = action.cpu().numpy()
+        if self.done:
+            obs, info = self.reset()
+            self.done = False 
+            return obs, 0, [False], [False], [info] 
+
+        if action.ndim == 3:
+            action = action[0]
+        target_pos = action + self.env.waypoints[self.env.current_waypoint_idx]
+        state, reward, done, truc, info = self.env.step(target_pos)
+        self.info['episode']['l'] += 1 
+        self.info['episode']['r'] += reward
+        self.done = done
+
+        return [state], [reward], [done], [truc], [self.info] 
+    
+    def reset(self, seed=0):
+        self.done = False 
+        state, _= self.env.reset()
+        self.info = {
+            'episode':{
+                'r': 0,
+                'l': 0,
+            }
+        }
+        return [ state ] , self.info 
+    

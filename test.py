@@ -19,6 +19,7 @@ def test(model_path, n_episodes=100, device="cuda"):
     
     # Initialize environment and model
     env = CustomEnv(battery_alpha=0.0)
+    # env.env.TIME_LIMIT_SEC = 10
     
     # Get dimensions and action space bounds
     obs_dim = [env.single_observation_space.shape[0],]
@@ -51,7 +52,7 @@ def test(model_path, n_episodes=100, device="cuda"):
             with torch.no_grad():
                 state_tensor = torch.FloatTensor(state).to(device)
                 action = actor.get_action(state_tensor)[0]
-                action = action.cpu().numpy()
+                action = action.cpu().numpy() # -1 to 1 range  x y z --> x +dx, y +dy, z (x,y,z) -> dx, dy 
             
             # Take step in environment
             next_state, reward, done, _, info = env.step(action)
@@ -120,5 +121,5 @@ def test(model_path, n_episodes=100, device="cuda"):
     return mean_reward, std_reward, success_rate, mean_waypoint_progress
 
 if __name__ == "__main__":
-    model_path = "outputs/battery_0.1_seed1/20241111_021934/actor_30000.pth"
+    model_path = "outputs/battery_0.0_seed1/20241111_030128/actor_final.pth"
     test(model_path, n_episodes=10)

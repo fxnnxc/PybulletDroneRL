@@ -5,7 +5,7 @@ import gymnasium as gym
 import torch.nn as nn
 import torch.optim as optim
 from sac import Actor, SoftQNetwork, train_sac
-from env import BatteryWayPointAviary
+from env import BatteryWayPointAviary, CustomEnv
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 import os
 from datetime import datetime
@@ -42,58 +42,6 @@ def parse_args():
                         help="Random seed (default: 1)")
     args = parser.parse_args()
     return args
-
-class CustomEnv():
-    def __init__(self, battery_alpha):
-
-        DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-        DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
-
-        self.env = BatteryWayPointAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, battery_alpha=battery_alpha)
-        
-        action_dim = 3
-        obs_dim = self.env.observation_space.shape[-1]
-        
-        print("=======Pybullet============")
-        print(self.env.action_space)
-        print(self.env.observation_space.shape)
-        print("===========================")
-        
-        ACTION_BOUND = 0.1
-        self.single_action_space  = gym.spaces.Box(-ACTION_BOUND, ACTION_BOUND, shape=(action_dim,))
-        self.single_observation_space  = gym.spaces.Box(-np.inf, np.inf, shape=(obs_dim,), dtype=np.float32)
-        
-        
-    def step(self, action):
-        if isinstance(action, torch.Tensor):
-            action = action.cpu().numpy()
-        if self.done:
-            obs, info = self.env.reset()
-            self.done = False 
-            return [obs], 0, [False], [False], [info] 
-
-        if action.ndim == 3:
-            action = action[0]
-        target_pos = action + self.env.waypoints[self.env.current_waypoint_idx]
-        state, reward, done, truc, info = self.env.step(target_pos)
-        self.info['episode']['l'] += 1 
-        self.info['episode']['r'] += reward
-        self.done = done
-
-        return [state], [reward], [done], [truc], [self.info] 
-    
-    def reset(self, seed=0):
-        self.done = False 
-        state, _= self.env.reset()
-        self.info = {
-            'episode':{
-                'r': 0,
-                'l': 0,
-            }
-        }
-        return state, self.info 
-    
-
 
 def main():
     args = parse_args()
