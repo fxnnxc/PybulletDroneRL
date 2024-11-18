@@ -40,7 +40,8 @@ def main():
     last_time = start_time
     index =0 
     x_pos= path_data[NAME]['x'][0]
-    target_time=20
+    target_time=5
+    distance_increase_ratio=2.0
     interval=target_time/len(path_data[NAME]['t'])
     while index < len(path_data[NAME]['t']):
         # 현재 경과 시간 계산
@@ -49,7 +50,7 @@ def main():
         # x 위치 계산
         if current_time - last_time > interval:
             index = index + 1
-            x_pos = get_path_position(path_data, NAME, index)
+            x_pos = get_path_position(path_data, NAME, index) * distance_increase_ratio
             last_time = current_time
             print(f"Time: {current_time - start_time:.2f}/{target_time} s, X Position: {x_pos:.3f}")
         time.sleep(0.01)        
