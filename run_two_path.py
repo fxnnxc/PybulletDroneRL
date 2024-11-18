@@ -14,6 +14,12 @@ def get_path_position(path_data, path_name, index):
         return x_array[index]
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Run two paths')
+    parser.add_argument('--name', type=int, default=0)
+    parser.add_argument('--tt', type=float, default=20)
+    parser.add_argument('--dis', type=float, default=2.0)
+    args = parser.parse_args()
     # 경로 이름 설정
     NAMES = ['constant_speed', 
              'fast_then_slow1',
@@ -25,9 +31,9 @@ def main():
             'periodic_speed1',
             'periodic_speed2']
     # NAME = 'constant_speed'
-    NAME = NAMES[1]
-    target_time=20
-    distance_increase_ratio=2.0  # 1.0 = 10 m
+    NAME = NAMES[args.name]
+    target_time=args.tt
+    distance_increase_ratio=args.dis  # 1.0 = 10 m
     
     # 경로 데이터 불러오기
     try:
@@ -42,7 +48,7 @@ def main():
     last_time = start_time
     index =0 
     x_pos= path_data[NAME]['x'][0]
-
+    
     interval=target_time/len(path_data[NAME]['t'])
     while index < len(path_data[NAME]['t']):
         # 현재 경과 시간 계산
@@ -53,9 +59,9 @@ def main():
             index = index + 1
             x_pos = get_path_position(path_data, NAME, index) * distance_increase_ratio
             last_time = current_time
-            print(f"Time: {current_time - start_time:.2f}/{target_time} s, X Position: {x_pos:.3f}")
+            print(f"Time: {NAME} {current_time - start_time:.2f}/{target_time} s, X Position: {x_pos:.3f}")
         time.sleep(0.01)        
-    print("Path completed!")
+    print(f"{NAME} completed!")
     
         
 
