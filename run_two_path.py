@@ -53,7 +53,6 @@ def main():
     while index < len(path_data[NAME]['t']):
         # 현재 경과 시간 계산
         current_time = time.time()
-        
         # x 위치 계산
         if current_time - last_time > interval:
             index = index + 1
