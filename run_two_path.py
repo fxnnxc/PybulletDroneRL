@@ -26,8 +26,8 @@ def main():
             'periodic_speed2']
     # NAME = 'constant_speed'
     NAME = NAMES[1]
-    target_time=5
-    distance_increase_ratio=2.0
+    target_time=20
+    distance_increase_ratio=2.0  # 1.0 = 10 m
     
     # 경로 데이터 불러오기
     try:
