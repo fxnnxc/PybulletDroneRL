@@ -26,6 +26,8 @@ def main():
             'periodic_speed2']
     # NAME = 'constant_speed'
     NAME = NAMES[1]
+    target_time=5
+    distance_increase_ratio=2.0
     
     # 경로 데이터 불러오기
     try:
@@ -40,8 +42,7 @@ def main():
     last_time = start_time
     index =0 
     x_pos= path_data[NAME]['x'][0]
-    target_time=5
-    distance_increase_ratio=2.0
+
     interval=target_time/len(path_data[NAME]['t'])
     while index < len(path_data[NAME]['t']):
         # 현재 경과 시간 계산
